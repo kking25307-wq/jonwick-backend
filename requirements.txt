@@ -5,3 +5,4 @@ requests==2.31.0
 gunicorn
 dnspython==2.3.0
 setuptools
+curl_cffi
