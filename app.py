@@ -31,15 +31,13 @@ def logic_trend(history):
     big_count = sum(1 for x in history[:5] if int(x.get('number', 0)) >= 5)
     return "BIG" if big_count >= 3 else "SMALL"
 
-def logic_reverse(history):
-    return "SMALL" if logic_trend(history) == "BIG" else "BIG"
-
 def get_best_prediction(history):
     trend_pred = logic_trend(history)
     strategy = "TREND FOLLOWER"
     return trend_pred, strategy
 
 def run_autobot():
+    print("Auto-bot background thread started!")
     previous_period = ""
     
     headers = {
@@ -52,8 +50,8 @@ def run_autobot():
         try:
             url = "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json?page=1&size=20"
             
-            # ഇവിടെ impersonate="chrome120" എന്ന് നൽകിയാൽ വിൻഗോ വിചാരിക്കുന്നത് ഇതൊരു യഥാർത്ഥ കമ്പ്യൂട്ടറിലെ ക്രോം ബ്രൗസർ ആണെന്നാണ്!
-            res = requests.get(url, headers=headers, impersonate="chrome120", timeout=15)
+            # അപ്ഡേറ്റ് ചെയ്ത ഭാഗം: impersonate="chrome" എന്നത് മാറ്റി impersonate="chrome110" എന്നാക്കി. 
+            res = requests.get(url, headers=headers, impersonate="chrome110", timeout=15)
             data = res.json()
             history = data.get('data', {}).get('list', [])
             
@@ -84,16 +82,20 @@ def run_autobot():
                     previous_period = current_period
                     
         except Exception as e:
-            print("Auto-bot API Error:", e)
+            print(f"Auto-bot Error: {e}")
             
         time.sleep(5)
 
-bot_thread = threading.Thread(target=run_autobot)
-bot_thread.daemon = True
-bot_thread.start()
+# Flask ആപ്പ് റൺ ചെയ്യുന്നതിന് തൊട്ടുമുൻപായി ത്രെഡ് സ്റ്റാർട്ട് ചെയ്യുന്നു
+@app.before_first_request
+def activate_job():
+    bot_thread = threading.Thread(target=run_autobot)
+    bot_thread.daemon = True
+    bot_thread.start()
 
 @app.route('/')
 def home():
+    # ഇത് ആരെങ്കിലും വിളിക്കുമ്പോൾ (ഉദാഹരണത്തിന് നിങ്ങളുടെ ക്രോൺ ജോബ്) ബോട്ട് സ്റ്റാർട്ട് ആകും
     return jsonify({
         "engine": "JONWICK2 PRO",
         "message": "24/7 AI BOT IS ACTIVE",
