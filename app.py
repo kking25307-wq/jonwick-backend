@@ -43,17 +43,25 @@ def run_autobot():
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Origin": "https://draw.ar-lottery01.com",
-        "Referer": "https://draw.ar-lottery01.com/"
+        "Referer": "https://draw.ar-lottery01.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
     while True:
         try:
             url = "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json?page=1&size=20"
             
-            # curl_cffi ഉപയോഗിച്ച് ക്രോം ബ്രൗസർ ആണെന്ന് തെറ്റിദ്ധരിപ്പിക്കുന്നു
-            res = requests.get(url, headers=headers, impersonate="chrome110", timeout=15)
-            data = res.json()
-            history = data.get('data', {}).get('list', [])
+            print("Fetching data from WinGo...")
+            res = requests.get(url, headers=headers, impersonate="chrome120", timeout=15)
+            print(f"WinGo API Response Code: {res.status_code}")
+            
+            try:
+                data = res.json()
+                history = data.get('data', {}).get('list', [])
+            except Exception as json_err:
+                print(f"JSON Error (Cloudflare blocked?): {json_err}")
+                print(f"Raw Response: {res.text[:200]}")
+                history = []
             
             if history:
                 latest = history[0]
@@ -86,7 +94,6 @@ def run_autobot():
             
         time.sleep(5)
 
-# യാതൊരു എററുമില്ലാതെ ത്രെഡ് നേരിട്ട് സ്റ്റാർട്ട് ചെയ്യുന്നു
 bot_thread = threading.Thread(target=run_autobot)
 bot_thread.daemon = True
 bot_thread.start()
