@@ -1,6 +1,7 @@
 import time
 import threading
-from curl_cffi import requests
+import urllib.parse
+import requests as req
 from flask import Flask, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
@@ -14,9 +15,8 @@ try:
     client = MongoClient(MONGO_URI)
     db = client['jonwick_db']
     logs_collection = db['prediction_logs']
-    print("MongoDB Connected Successfully!")
 except Exception as e:
-    print("MongoDB Connection Error:", e)
+    pass
 
 system_state = {
     "status": "24/7 ENGINE RUNNING",
@@ -31,68 +31,63 @@ def logic_trend(history):
     big_count = sum(1 for x in history[:5] if int(x.get('number', 0)) >= 5)
     return "BIG" if big_count >= 3 else "SMALL"
 
-def get_best_prediction(history):
-    trend_pred = logic_trend(history)
-    strategy = "TREND FOLLOWER"
-    return trend_pred, strategy
-
 def run_autobot():
-    print("Auto-bot background thread started!")
+    print("Auto-bot background thread started with Proxy Bypass!")
     previous_period = ""
-    
-    headers = {
-        "Accept": "application/json, text/plain, */*",
-        "Origin": "https://draw.ar-lottery01.com",
-        "Referer": "https://draw.ar-lottery01.com/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
     
     while True:
         try:
-            url = "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json?page=1&size=20"
+            t = int(time.time())
+            raw_url = f"https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json?page=1&size=20&t={t}"
             
-            print("Fetching data from WinGo...")
-            res = requests.get(url, headers=headers, impersonate="chrome120", timeout=15)
-            print(f"WinGo API Response Code: {res.status_code}")
-            
+            data = None
             try:
+                # Proxy 1: CodeTabs API
+                res = req.get(f"https://api.codetabs.com/v1/proxy?quest={raw_url}", timeout=10)
                 data = res.json()
+            except:
+                try:
+                    # Proxy 2: AllOrigins Fallback
+                    encoded_url = urllib.parse.quote(raw_url, safe='')
+                    res = req.get(f"https://api.allorigins.win/raw?url={encoded_url}", timeout=10)
+                    data = res.json()
+                except:
+                    pass
+            
+            if data:
                 history = data.get('data', {}).get('list', [])
-            except Exception as json_err:
-                print(f"JSON Error (Cloudflare blocked?): {json_err}")
-                print(f"Raw Response: {res.text[:200]}")
-                history = []
-            
-            if history:
-                latest = history[0]
-                current_period = str(latest.get('issueNumber', ''))
-                
-                if previous_period != current_period and current_period != "":
-                    actual_num = int(latest.get('number', 0))
-                    actual_type = "BIG" if actual_num >= 5 else "SMALL"
+                if history:
+                    latest = history[0]
+                    current_period = str(latest.get('issueNumber', ''))
                     
-                    log_entry = {
-                        "period": current_period,
-                        "actual_result": actual_type,
-                        "actual_number": actual_num,
-                        "timestamp": time.time()
-                    }
-                    logs_collection.insert_one(log_entry)
-                    
-                    next_pred, strat = get_best_prediction(history)
-                    
-                    system_state['current_period'] = current_period
-                    system_state['next_prediction'] = next_pred
-                    system_state['strategy_used'] = strat
-                    system_state['last_sync'] = time.strftime('%Y-%m-%d %H:%M:%S')
-                    
-                    print(f"SUCCESS: Period {current_period} Saved! Next Pred: {next_pred}")
-                    previous_period = current_period
-                    
+                    if previous_period != current_period and current_period != "":
+                        actual_num = int(latest.get('number', 0))
+                        actual_type = "BIG" if actual_num >= 5 else "SMALL"
+                        
+                        log_entry = {
+                            "period": current_period,
+                            "actual_result": actual_type,
+                            "actual_number": actual_num,
+                            "timestamp": time.time()
+                        }
+                        try:
+                            logs_collection.insert_one(log_entry)
+                        except:
+                            pass
+                        
+                        next_pred = logic_trend(history)
+                        
+                        system_state['current_period'] = current_period
+                        system_state['next_prediction'] = next_pred
+                        system_state['strategy_used'] = "TREND FOLLOWER"
+                        system_state['last_sync'] = time.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        print(f"SUCCESS: Period {current_period} Saved! Next Pred: {next_pred}")
+                        previous_period = current_period
         except Exception as e:
-            print(f"Auto-bot Error: {e}")
+            pass
             
-        time.sleep(5)
+        time.sleep(3)
 
 bot_thread = threading.Thread(target=run_autobot)
 bot_thread.daemon = True
