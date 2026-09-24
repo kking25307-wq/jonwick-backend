@@ -50,7 +50,7 @@ def run_autobot():
         try:
             url = "https://draw.ar-lottery01.com/WinGo/WinGo_30S/GetHistoryIssuePage.json?page=1&size=20"
             
-            # അപ്ഡേറ്റ് ചെയ്ത ഭാഗം: impersonate="chrome" എന്നത് മാറ്റി impersonate="chrome110" എന്നാക്കി. 
+            # curl_cffi ഉപയോഗിച്ച് ക്രോം ബ്രൗസർ ആണെന്ന് തെറ്റിദ്ധരിപ്പിക്കുന്നു
             res = requests.get(url, headers=headers, impersonate="chrome110", timeout=15)
             data = res.json()
             history = data.get('data', {}).get('list', [])
@@ -86,16 +86,13 @@ def run_autobot():
             
         time.sleep(5)
 
-# Flask ആപ്പ് റൺ ചെയ്യുന്നതിന് തൊട്ടുമുൻപായി ത്രെഡ് സ്റ്റാർട്ട് ചെയ്യുന്നു
-@app.before_first_request
-def activate_job():
-    bot_thread = threading.Thread(target=run_autobot)
-    bot_thread.daemon = True
-    bot_thread.start()
+# യാതൊരു എററുമില്ലാതെ ത്രെഡ് നേരിട്ട് സ്റ്റാർട്ട് ചെയ്യുന്നു
+bot_thread = threading.Thread(target=run_autobot)
+bot_thread.daemon = True
+bot_thread.start()
 
 @app.route('/')
 def home():
-    # ഇത് ആരെങ്കിലും വിളിക്കുമ്പോൾ (ഉദാഹരണത്തിന് നിങ്ങളുടെ ക്രോൺ ജോബ്) ബോട്ട് സ്റ്റാർട്ട് ആകും
     return jsonify({
         "engine": "JONWICK2 PRO",
         "message": "24/7 AI BOT IS ACTIVE",
